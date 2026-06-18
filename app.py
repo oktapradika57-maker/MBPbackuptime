@@ -10,7 +10,7 @@ st.set_page_config(
     initial_sidebar_state="expanded"
 )
 
-# Kustomisasi CSS untuk mempercantik UI & Metric Card
+# Kustomisasi CSS untuk mempercantik UI & Metric Card (Sudah diperbaiki tanpa error)
 st.markdown("""
     <style>
     [data-testid="stMetricSimplevalue"] {
@@ -29,7 +29,7 @@ st.markdown("""
         margin-bottom: 20px;
     }
     </style>
-    """, unsafe_index=False, unsafe_allow_html=True)
+    """, unsafe_allow_html=True)
 
 # 2. MEMUAT & MEMPROSES DATA
 @st.cache_data
@@ -53,8 +53,7 @@ def load_data():
         df['Durasi RH Genset (Jam)'] = (df['RH Stop'] - df['RH Start']).round(2).fillna(0)
         df['Selisih Komparasi (Jam)'] = (df['Durasi RH Genset (Jam)'] - df['Durasi Aktual Waktu (Jam)']).round(2)
         
-        # Tambahkan status kecocokan untuk keperluan filter/analisis
-        # Toleransi perbedaan ± 0.1 Jam (6 menit)
+        # Tambahkan status kecocokan (Toleransi perbedaan ± 0.1 Jam / 6 menit)
         df['Status Validasi'] = df['Selisih Komparasi (Jam)'].apply(
             lambda x: "Sesuai" if abs(x) <= 0.1 else ("Kelebihan RH" if x > 0.1 else "Kekurangan RH")
         )
@@ -105,7 +104,7 @@ if not df_raw.empty:
     st.markdown('<p class="main-title">📊 Dashboard Analisis & Komparasi Jam Backup Genset</p>', unsafe_allow_html=True)
     st.markdown('<p class="sub-title">Membandingkan durasi riil berdasarkan log waktu kalender terhadap pembacaan mesin Hour Meter (RH).</p>', unsafe_allow_html=True)
 
-    # 5. RINGKASAN KPI UTAMA (Menggunakan Metric UI Baru)
+    # 5. RINGKASAN KPI UTAMA
     total_aktual = df_filtered['Durasi Aktual Waktu (Jam)'].sum()
     total_rh = df_filtered['Durasi RH Genset (Jam)'].sum()
     total_selisih = df_filtered['Selisih Komparasi (Jam)'].sum()
@@ -120,7 +119,6 @@ if not df_raw.empty:
     with kpi3:
         st.metric(label="⚙️ Total Durasi HM (Mesin)", value=f"{total_rh:,.2f} Jam")
     with kpi4:
-        # Menentukan delta visual untuk selisih deviasi
         delta_color = "normal" if abs(total_selisih) < 1.0 else "inverse"
         st.metric(
             label="⚠️ Total Deviasi Selisih", 
@@ -139,14 +137,12 @@ if not df_raw.empty:
         st.subheader("📌 Grafik Batang Komparasi per Tiket")
         
         if not df_filtered.empty:
-            # Melt data untuk visualisasi berpasangan
             chart_df = df_filtered.reset_index().melt(
                 id_vars=['Ticket Number SWFM', 'Site Name'], 
                 value_vars=['Durasi Aktual Waktu (Jam)', 'Durasi RH Genset (Jam)'],
                 var_name='Metode Hitung', value_name='Total Jam'
             )
             
-            # Pengaturan Grafik Profesional
             fig_compare = px.bar(
                 chart_df, 
                 x='Ticket Number SWFM', 
@@ -154,78 +150,11 @@ if not df_raw.empty:
                 color='Metode Hitung', 
                 barmode='group',
                 color_discrete_map={
-                    'Durasi Aktual Waktu (Jam)': '#3B82F6', # Biru Modern
-                    'Durasi RH Genset (Jam)': '#F59E0B'     # Amber/Orange hangat
+                    'Durasi Aktual Waktu (Jam)': '#3B82F6', 
+                    'Durasi RH Genset (Jam)': '#F59E0B'
                 },
                 template="plotly_white"
             )
             
             fig_compare.update_layout(
-                margin=dict(l=20, r=20, t=10, b=20),
-                legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="right", x=1),
-                xaxis_title="Nomor Tiket SWFM",
-                yaxis_title="Durasi (Jam)",
-                hovermode="x unified"
-            )
-            st.plotly_chart(fig_compare, use_container_width=True)
-        else:
-            st.warning("Tidak ada data untuk ditampilkan pada grafik berdasarkan filter Anda.")
-
-    with col_insight:
-        st.subheader("💡 Komposisi Validasi")
-        # Grafik Donut untuk melihat distribusi status validasi data
-        if not df_filtered.empty:
-            fig_pie = px.pie(
-                df_filtered, 
-                names='Status Validasi', 
-                hole=0.5,
-                color='Status Validasi',
-                color_discrete_map={
-                    'Sesuai': '#10B981',      # Hijau Emerald
-                    'Kelebihan RH': '#EF4444', # Merah
-                    'Kekurangan RH': '#3B82F6' # Biru
-                },
-                template="plotly_white"
-            )
-            fig_pie.update_layout(margin=dict(l=10, r=10, t=10, b=10), legend=dict(orientation="h"))
-            st.plotly_chart(fig_pie, use_container_width=True)
-
-    st.markdown("---")
-
-    # 7. TABEL DETAIL & EKSPOR DATA
-    st.subheader("📋 Tabel Detail Komparasi & Validasi Data")
-    
-    kolom_tampilan = [
-        'Ticket Number SWFM', 'Site Name', 
-        'RH Start Time', 'RH Stop Time', 'Durasi Aktual Waktu (Jam)',
-        'RH Start', 'RH Stop', 'Durasi RH Genset (Jam)',
-        'Selisih Komparasi (Jam)', 'Status Validasi'
-    ]
-    
-    # Fungsi styling warna background pada dataframe berdasarkan penyimpangan data
-    def style_status(val):
-        if val == 'Sesuai':
-            return 'background-color: #D1FAE5; color: #065F46;' # Hijau Muda
-        elif 'Kelebihan' in str(val):
-            return 'background-color: #FEE2E2; color: #991B1B;' # Merah Muda
-        else:
-            return 'background-color: #DBEAFE; color: #1E40AF;' # Biru Muda
-
-    # Menampilkan DataFrame dengan styling interaktif
-    if not df_filtered.empty:
-        styled_df = df_filtered[kolom_tampilan].style.map(style_status, subset=['Status Validasi'])
-        st.dataframe(styled_df, use_container_width=True, height=400)
-        
-        # Fitur Tambahan: Tombol Download Excel/CSV
-        csv = df_filtered[kolom_tampilan].to_csv(index=False).encode('utf-8')
-        st.download_button(
-            label="📥 Unduh Laporan Terfilter (.CSV)",
-            data=csv,
-            file_name="Laporan_Analisis_RH_Genset.csv",
-            mime="text/csv"
-        )
-    else:
-        st.info("Pilih filter pada sidebar untuk memunculkan tabel data.")
-
-else:
-    st.info("💡 Menunggu koneksi atau pengecekan struktur Google Sheets Anda. Pastikan nama-nama kolom sudah sesuai.")
+                margin=dict(l=20, r
