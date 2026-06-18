@@ -12,7 +12,7 @@ st.markdown("---")
 def load_data():
     # Ganti dengan path file lokal Anda jika dijalankan offline, 
     # atau biarkan membaca langsung dari database Anda.
-    df = pd.read_excel("database_mbp.xlsx") 
+  sheet_id = "1CrupWIBU3NP49ORN3AxC6ave7SD01ds_odu7NVBOIoI"
     
     # Konversi kolom waktu ke format datetime agar bisa dikurangi
     df['RH Start Time'] = pd.to_datetime(df['RH Start Time'], errors='coerce')
