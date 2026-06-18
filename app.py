@@ -28,6 +28,38 @@ def load_data():
     try:
         df = pd.read_csv(url)
         
+        # Bersihkan spasi gaib di awal/akhir nama kolom Google Sheets dan samakan persepsi kolom
+        df.columns = df.columns.str.strip()
+        
+        # PETA UNTUK MENCOCOKKAN KOLOM SECARA OTOMATIS (Mencegah KeyError)
+        col_mapping = {}
+        for col in df.columns:
+            col_lower = col.lower()
+            if 'ticket' in col_lower or 'tiket' in col_lower:
+                col_mapping[col] = 'Ticket Number SWFM'
+            elif 'site' in col_lower:
+                col_mapping[col] = 'Site Name'
+            elif 'start' in col_lower and 'time' in col_lower:
+                col_mapping[col] = 'RH Start Time'
+            elif 'stop' in col_lower and 'time' in col_lower:
+                col_mapping[col] = 'RH Stop Time'
+            elif 'start' in col_lower and 'time' not in col_lower:
+                col_mapping[col] = 'RH Start'
+            elif 'stop' in col_lower and 'time' not in col_lower:
+                col_mapping[col] = 'RH Stop'
+                
+        # Ganti nama kolom asli menjadi nama standar yang dikenali sistem
+        df = df.rename(columns=col_mapping)
+        
+        # Validasi ketersediaan kolom kritikal
+        required_cols = ['RH Start Time', 'RH Stop Time', 'RH Start', 'RH Stop', 'Ticket Number SWFM', 'Site Name']
+        missing_cols = [c for c in required_cols if c not in df.columns]
+        
+        if missing_cols:
+            st.error(f"❌ Kolom di Google Sheets Anda tidak lengkap atau tidak dikenali oleh sistem. Kolom yang kurang atau salah ketik: {missing_cols}")
+            st.info(f"💡 Kolom yang terdeteksi di Google Sheets Anda saat ini hanya: {list(df.columns)}")
+            return pd.DataFrame()
+        
         # Konversi Kolom Waktu & Angka
         df['RH Start Time'] = pd.to_datetime(df['RH Start Time'], errors='coerce')
         df['RH Stop Time'] = pd.to_datetime(df['RH Stop Time'], errors='coerce')
@@ -121,7 +153,6 @@ if not df_raw.empty:
                 template="plotly_white"
             )
             
-            # Perbaikan margin & penutupan fungsi dict secara aman satu baris
             fig_compare.update_layout(margin=dict(l=20, r=20, t=20, b=20), hovermode="x unified")
             st.plotly_chart(fig_compare, use_container_width=True)
 
